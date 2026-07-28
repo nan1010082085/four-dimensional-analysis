@@ -225,14 +225,31 @@ function updateChart() {
       formatter: function(params) {
         let result = ''
         let signalInfo = ''
+        let indicatorInfo = ''
+        
+        // 日期
+        const date = params[0]?.axisValue || ''
+        result += `<div style="font-weight:bold;margin-bottom:8px;color:#58a6ff">${date}</div>`
         
         params.forEach(p => {
           if (p.seriesType === 'candlestick') {
-            result += `<div style="font-weight:bold;margin-bottom:5px">${p.axisValue}</div>`
-            result += `<div>开: ${p.data[1]} 收: ${p.data[2]}</div>`
-            result += `<div>低: ${p.data[3]} 高: ${p.data[4]}</div>`
+            // K线数据
+            const open = p.data[1]
+            const close = p.data[2]
+            const low = p.data[3]
+            const high = p.data[4]
+            const change = close - open
+            const changeColor = change >= 0 ? '#ef232a' : '#14b143'
+            
+            result += `<div style="margin-bottom:4px">`
+            result += `<span style="color:#8b949e">开:</span> ${open} `
+            result += `<span style="color:#8b949e">收:</span> <span style="color:${changeColor};font-weight:bold">${close}</span> `
+            result += `<span style="color:#8b949e">低:</span> ${low} `
+            result += `<span style="color:#8b949e">高:</span> ${high}`
+            result += `</div>`
+            result += `<div style="color:${changeColor}">涨跌: ${change >= 0 ? '+' : ''}${change.toFixed(2)}</div>`
           } else if (p.seriesName === '成交量') {
-            result += `<div>成交量: ${formatVolume(p.value)}</div>`
+            result += `<div><span style="color:#8b949e">成交量:</span> ${formatVolume(p.value)}</div>`
           } else if (p.seriesName === '入' && p.data && p.data.reasons) {
             signalInfo += `<div style="color:#14b143;font-weight:bold;margin-top:8px">▲ 入场信号</div>`
             signalInfo += `<div style="color:#14b143">价格: ${p.data.price}</div>`
@@ -241,8 +258,28 @@ function updateChart() {
             signalInfo += `<div style="color:#ef232a;font-weight:bold;margin-top:8px">▼ 出场信号</div>`
             signalInfo += `<div style="color:#ef232a">价格: ${p.data.price}</div>`
             signalInfo += `<div style="color:#ef232a">原因: ${p.data.reasons.join(', ')}</div>`
+          } else if (['MA5', 'MA10', 'MA20', 'MA60'].includes(p.seriesName) && p.value != null) {
+            // 均线
+            const colors = { MA5: '#58a6ff', MA10: '#d29922', MA20: '#8b949e', MA60: '#f0f0f0' }
+            indicatorInfo += `<div><span style="color:${colors[p.seriesName] || '#8b949e'}">${p.seriesName}:</span> ${p.value}</div>`
+          } else if (['DIF', 'DEA'].includes(p.seriesName) && p.value != null) {
+            // MACD指标
+            const colors = { DIF: '#58a6ff', DEA: '#d29922' }
+            indicatorInfo += `<div><span style="color:${colors[p.seriesName]}">${p.seriesName}:</span> ${p.value}</div>`
+          } else if (['K', 'D', 'J'].includes(p.seriesName) && p.value != null) {
+            // KDJ指标
+            const colors = { K: '#58a6ff', D: '#14b143', J: '#ef232a' }
+            indicatorInfo += `<div><span style="color:${colors[p.seriesName]}">${p.seriesName}:</span> ${p.value}</div>`
+          } else if (p.seriesName === 'MACD' && p.value != null) {
+            const color = p.value >= 0 ? '#ef232a' : '#14b143'
+            indicatorInfo += `<div><span style="color:#8b949e">MACD:</span> <span style="color:${color}">${p.value}</span></div>`
           }
         })
+        
+        // 合并所有信息
+        if (indicatorInfo) {
+          result += `<div style="border-top:1px solid #283040;margin-top:6px;padding-top:6px">${indicatorInfo}</div>`
+        }
         
         return result + signalInfo
       }
