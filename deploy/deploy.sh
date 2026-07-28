@@ -21,7 +21,7 @@ echo ""
 
 # 检查SSH连接
 echo "检查SSH连接..."
-ssh -q "${SERVER}" exit || { echo "SSH连接失败"; exit 1; }
+ssh -o ConnectTimeout=10 -o StrictHostKeyChecking=no "${SERVER}" "echo ok" || { echo "SSH连接失败"; exit 1; }
 
 # 打包前端
 echo "构建前端..."
