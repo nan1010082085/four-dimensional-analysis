@@ -116,6 +116,7 @@
 
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue'
+import { fetchApi } from '../api.js'
 
 const props = defineProps({
   code: String,
@@ -156,8 +157,7 @@ const takeProfitPlaceholder = computed(() => {
 // 加载状态
 async function loadStatus() {
   try {
-    const res = await fetch('/api/paper/status')
-    const data = await res.json()
+    const data = await fetchApi('/api/paper/status')
     if (data.ok) {
       status.value = data.data
     }
@@ -169,8 +169,7 @@ async function loadStatus() {
 // 加载交易记录
 async function loadTrades() {
   try {
-    const res = await fetch('/api/paper/trades?limit=10')
-    const data = await res.json()
+    const data = await fetchApi('/api/paper/trades?limit=10')
     if (data.ok) {
       recentTrades.value = data.data.reverse()
     }
@@ -184,7 +183,7 @@ async function executeBuy() {
   if (!props.quote) return
   
   try {
-    const res = await fetch('/api/paper/buy', {
+    const data = await fetchApi('/api/paper/buy', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -198,7 +197,6 @@ async function executeBuy() {
       })
     })
     
-    const data = await res.json()
     if (data.ok) {
       alert('买入成功！')
       loadStatus()
@@ -219,7 +217,7 @@ async function executeSell() {
   if (!pos) return
   
   try {
-    const res = await fetch('/api/paper/sell', {
+    const data = await fetchApi('/api/paper/sell', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -230,7 +228,6 @@ async function executeSell() {
       })
     })
     
-    const data = await res.json()
     if (data.ok) {
       const trade = data.data.trade
       alert(`卖出成功！盈亏: ${trade.pnl >= 0 ? '+' : ''}${trade.pnl}`)
@@ -249,7 +246,7 @@ async function resetPaper() {
   if (!confirm('确定要重置模拟盘吗？所有数据将清空。')) return
   
   try {
-    await fetch('/api/paper/reset', { method: 'POST' })
+    await fetchApi('/api/paper/reset', { method: 'POST' })
     loadStatus()
     loadTrades()
     alert('模拟盘已重置')

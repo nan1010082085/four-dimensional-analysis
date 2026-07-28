@@ -52,6 +52,7 @@
 
 <script setup>
 import { ref, defineProps } from 'vue'
+import { fetchApi } from '../api.js'
 
 const props = defineProps({
   code: String,
@@ -85,8 +86,7 @@ async function requestAnalysis() {
   
   try {
     const url = `/api/ai-analysis?code=${encodeURIComponent(props.code)}&period=${props.period}&type=${analysisType.value}`
-    const res = await fetch(url)
-    const data = await res.json()
+    const data = await fetchApi(url)
     
     if (data.ok) {
       analysis.value = data.analysis

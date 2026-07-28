@@ -52,6 +52,8 @@
 <script setup>
 import { ref, onMounted, onUnmounted } from 'vue'
 
+import { fetchApi } from '../api.js'
+
 const emit = defineEmits(['select', 'signal'])
 
 const watchlist = ref([])
@@ -138,8 +140,7 @@ function selectStock(stock) {
 
 async function refreshStock(code) {
   try {
-    const res = await fetch(`/api/quote?code=${encodeURIComponent(code)}`)
-    const data = await res.json()
+    const data = await fetchApi(`/api/quote?code=${encodeURIComponent(code)}`)
     if (data.ok) {
       const stock = watchlist.value.find(s => s.code === code)
       if (stock) {
@@ -165,8 +166,7 @@ async function scanSignals() {
   
   for (const stock of watchlist.value) {
     try {
-      const res = await fetch(`/api/analysis?code=${encodeURIComponent(stock.code)}&period=day&limit=20`)
-      const data = await res.json()
+      const data = await fetchApi(`/api/analysis?code=${encodeURIComponent(stock.code)}&period=day&limit=20`)
       if (data.ok && data.kline) {
         // 简单的信号判断
         const bars = data.kline.bars

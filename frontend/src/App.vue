@@ -143,6 +143,7 @@
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { getApiUrl, fetchApi } from './api.js'
 import QuoteCard from './components/QuoteCard.vue'
 import FundamentalsCard from './components/FundamentalsCard.vue'
 import FundsCard from './components/FundsCard.vue'
@@ -414,8 +415,7 @@ async function loadAll() {
   setStatus('加载中…', false)
   try {
     const url = `/api/analysis?code=${encodeURIComponent(code.value)}&period=${period.value}&limit=160`
-    const res = await fetch(url)
-    const data = await res.json()
+    const data = await fetchApi(url)
     
     if (!data.ok) {
       setStatus('失败: ' + data.error, false)
@@ -428,9 +428,8 @@ async function loadAll() {
     funds.value = data.funds
     
     if (period.value === 'minute') {
-      const minuteRes = await fetch(`/api/minute?code=${encodeURIComponent(code.value)}`)
-      const minuteJson = await minuteRes.json()
-      minuteData.value = minuteJson.ok ? minuteJson.data : []
+      const minuteData2 = await fetchApi(`/api/minute?code=${encodeURIComponent(code.value)}`)
+      minuteData.value = minuteData2.ok ? minuteData2.data : []
     } else {
       kline.value = {
         bars: data.kline.bars,
@@ -447,8 +446,7 @@ async function loadAll() {
 async function refreshQuote() {
   if (document.hidden) return
   try {
-    const res = await fetch(`/api/quote?code=${encodeURIComponent(code.value)}`)
-    const data = await res.json()
+    const data = await fetchApi(`/api/quote?code=${encodeURIComponent(code.value)}`)
     if (data.ok) {
       quote.value = data.data
     }
