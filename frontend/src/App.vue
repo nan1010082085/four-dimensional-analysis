@@ -291,9 +291,9 @@ const periodLabels = {
 // 当前周期标签
 const currentPeriodLabel = computed(() => periodLabels[period.value] || '日K')
 
-// 是否为分钟周期
+// 是否为分时图（只有'minute'是真正的分时图）
 const isMinutePeriod = computed(() => {
-  return ['minute', '1', '2', '3', '5', '10', '15', '30', '60'].includes(period.value)
+  return period.value === 'minute'
 })
 
 // 选择周期
