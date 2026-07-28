@@ -4,15 +4,12 @@
       <span class="ai-icon">🤖</span>
       AI 量化分析 
       <small>DeepSeek 智能策略</small>
-      <button 
-        class="ai-btn" 
-        :class="{ loading: loading }"
-        :disabled="loading"
-        @click="requestAnalysis"
-      >
-        {{ loading ? '分析中...' : '重新分析' }}
-      </button>
     </h2>
+    
+    <!-- 信号方向指示 -->
+    <div v-if="signalDirection" class="signal-badge" :class="signalDirection">
+      {{ signalDirection === 'buy' ? '▲ 看多' : signalDirection === 'sell' ? '▼ 看空' : '◆ 观望' }}
+    </div>
     
     <div v-if="error" class="error">{{ error }}</div>
     
@@ -21,18 +18,28 @@
     </div>
     
     <div v-else-if="!loading" class="placeholder">
-      正在加载 AI 分析...
+      点击下方按钮获取 AI 分析报告
     </div>
     
     <div v-if="loading" class="loading-indicator">
       <div class="loading-spinner"></div>
       <span>AI 正在分析 {{ code }}...</span>
     </div>
+    
+    <!-- 分析按钮放在下方 -->
+    <button 
+      class="ai-btn" 
+      :class="{ loading: loading }"
+      :disabled="loading"
+      @click="requestAnalysis"
+    >
+      {{ loading ? '分析中...' : '开始 AI 分析' }}
+    </button>
   </div>
 </template>
 
 <script setup>
-import { ref, watch, onMounted } from 'vue'
+import { ref } from 'vue'
 import { fetchApi } from '../api.js'
 
 const props = defineProps({
@@ -46,10 +53,12 @@ const emit = defineEmits(['signal'])
 const loading = ref(false)
 const analysis = ref('')
 const error = ref('')
+const signalDirection = ref(null)
 
 async function requestAnalysis() {
   loading.value = true
   error.value = ''
+  signalDirection.value = null
   
   try {
     const url = `/api/ai-analysis?code=${encodeURIComponent(props.code)}&period=${props.period}&type=comprehensive`
@@ -114,6 +123,8 @@ function extractSignalDirection(text) {
     }
   }
   
+  signalDirection.value = direction
+  
   // 发送信号给父组件
   if (direction) {
     emit('signal', {
@@ -125,63 +136,53 @@ function extractSignalDirection(text) {
     })
   }
 }
-
-// 监听代码变化，自动分析
-watch(() => [props.code, props.period], () => {
-  if (props.code) {
-    requestAnalysis()
-  }
-}, { immediate: true })
 </script>
 
 <style scoped>
 .ai-card {
-  margin-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
 }
 
 .ai-card h2 {
   display: flex;
   align-items: center;
   gap: 8px;
+  margin: 0;
 }
 
 .ai-icon {
   font-size: 16px;
 }
 
-.ai-btn {
-  margin-left: auto;
-  padding: 6px 16px;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: white;
-  border: none;
+.signal-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 12px;
   border-radius: 6px;
-  cursor: pointer;
-  font-size: 12px;
-  font-weight: 500;
-  transition: all 0.3s;
+  font-size: 14px;
+  font-weight: bold;
+  width: fit-content;
 }
 
-.ai-btn:hover:not(:disabled) {
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+.signal-badge.buy {
+  background: rgba(20, 177, 67, 0.15);
+  color: #14b143;
+  border: 1px solid rgba(20, 177, 67, 0.3);
 }
 
-.ai-btn:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
+.signal-badge.sell {
+  background: rgba(239, 35, 42, 0.15);
+  color: #ef232a;
+  border: 1px solid rgba(239, 35, 42, 0.3);
 }
 
-.ai-btn.loading {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  background-size: 200% 200%;
-  animation: gradient 1.5s ease infinite;
-}
-
-@keyframes gradient {
-  0% { background-position: 0% 50%; }
-  50% { background-position: 100% 50%; }
-  100% { background-position: 0% 50%; }
+.signal-badge.hold {
+  background: rgba(88, 166, 255, 0.15);
+  color: #58a6ff;
+  border: 1px solid rgba(88, 166, 255, 0.3);
 }
 
 .error {
@@ -198,6 +199,8 @@ watch(() => [props.code, props.period], () => {
   background: var(--card2);
   border-radius: 8px;
   border: 1px solid var(--line);
+  max-height: 500px;
+  overflow-y: auto;
 }
 
 .analysis-text {
@@ -257,5 +260,40 @@ watch(() => [props.code, props.period], () => {
 
 @keyframes spin {
   to { transform: rotate(360deg); }
+}
+
+.ai-btn {
+  width: 100%;
+  padding: 12px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  transition: all 0.3s;
+}
+
+.ai-btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+}
+
+.ai-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.ai-btn.loading {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background-size: 200% 200%;
+  animation: gradient 1.5s ease infinite;
+}
+
+@keyframes gradient {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
 }
 </style>

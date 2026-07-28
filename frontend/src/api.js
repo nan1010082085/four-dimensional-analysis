@@ -3,11 +3,23 @@
 const API_BASE = import.meta.env.DEV ? '' : '/stock-analysis'
 
 export function getApiUrl(path) {
-  return `${API_BASE}${path}`
+  // 确保路径以 /api 开头
+  const apiPath = path.startsWith('/api') ? path : `/api${path}`
+  return `${API_BASE}${apiPath}`
 }
 
 export async function fetchApi(path, options = {}) {
   const url = getApiUrl(path)
-  const res = await fetch(url, options)
-  return res.json()
+  try {
+    const res = await fetch(url, options)
+    const text = await res.text()
+    // 检查是否返回了HTML
+    if (text.startsWith('<!DOCTYPE') || text.startsWith('<html')) {
+      throw new Error('API返回了HTML而非JSON，路径可能有误')
+    }
+    return JSON.parse(text)
+  } catch (e) {
+    console.error('API请求失败:', url, e)
+    throw e
+  }
 }

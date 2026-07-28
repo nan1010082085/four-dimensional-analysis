@@ -192,10 +192,9 @@
         </div>
       </div>
       
-      <!-- 右栏：AI分析 + 风险控制 -->
+      <!-- 右栏：AI分析 -->
       <div class="col-right">
         <AIAnalysis :code="code" :period="period" :kind="kind" @signal="handleAISignal" />
-        <RiskPanel :quote="quote" :kline="kline" :signal="currentSignal" />
       </div>
     </main>
   </div>
