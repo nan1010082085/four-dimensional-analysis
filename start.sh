@@ -19,7 +19,7 @@ fi
 # 激活虚拟环境并安装依赖
 echo "📦 安装 Python 依赖..."
 source venv/bin/activate
-pip install -q flask flask-cors python-dotenv akshare tushare
+pip install -q flask flask-cors python-dotenv tushare
 
 # 检查前端依赖
 if [ ! -d "frontend/node_modules" ]; then

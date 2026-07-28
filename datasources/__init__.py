@@ -121,7 +121,7 @@ class DataSourceFactory:
         """获取数据源实例
         
         Args:
-            source_type: 数据源类型 ('tushare', 'akshare', 'legacy')
+            source_type: 数据源类型 ('tushare', 'legacy')
             **kwargs: 数据源参数（如 token）
             
         Returns:
@@ -141,9 +141,6 @@ class DataSourceFactory:
                 from .tushare_source import TushareSource
                 token = kwargs.get('token') or os.environ.get('TUSHARE_TOKEN', '')
                 cls._instances[cache_key] = TushareSource(token=token)
-            elif source_type == 'akshare':
-                from .akshare_source import AkShareSource
-                cls._instances[cache_key] = AkShareSource()
             else:
                 raise ValueError(f"不支持的数据源类型: {source_type}")
         

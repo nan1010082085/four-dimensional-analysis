@@ -111,6 +111,28 @@
         {{ aiSignalDirection === 'buy' ? '▲ 看多' : aiSignalDirection === 'sell' ? '▼ 看空' : '◆ 观望' }}
       </div>
       
+      <!-- 数据源切换 -->
+      <div class="datasource-wrapper">
+        <div class="datasource-btn" @click="showDatasourcePanel = !showDatasourcePanel">
+          <span class="ds-icon">📡</span>
+          <span class="ds-label">{{ currentDatasourceLabel }}</span>
+        </div>
+        <div v-if="showDatasourcePanel" class="datasource-panel" @click.stop>
+          <div class="ds-title">数据源选择</div>
+          <div 
+            v-for="ds in availableDatasources" 
+            :key="ds.value"
+            class="ds-item"
+            :class="{ active: dataSource === ds.value }"
+            @click="switchDatasource(ds.value)"
+          >
+            <span class="ds-name">{{ ds.name }}</span>
+            <span class="ds-desc">{{ ds.desc }}</span>
+            <span v-if="dataSource === ds.value" class="ds-check">✓</span>
+          </div>
+        </div>
+      </div>
+      
       <div id="status">
         <span class="dot" :class="{ live: isLive }"></span>
         <span>{{ statusText }}</span>
@@ -233,8 +255,18 @@ const showPanel = ref(false)
 const showPeriodPanel = ref(false)
 const showPaperTrading = ref(false)
 const showRiskPanel = ref(false)
+const showDatasourcePanel = ref(false)
 const activeTab = ref('hot')
 const searchText = ref('sh600519')
+
+// 数据源相关
+const dataSource = ref('legacy')
+const availableDatasources = ref([])
+
+const currentDatasourceLabel = computed(() => {
+  const ds = availableDatasources.value.find(d => d.value === dataSource.value)
+  return ds ? ds.name : '数据源'
+})
 const currentSignal = ref(null)
 const signalStockCode = ref('')
 const signalStockName = ref('')
@@ -537,8 +569,8 @@ async function loadAll() {
       minuteData.value = minuteData2.ok ? minuteData2.data : []
     } else {
       kline.value = {
-        bars: data.kline.bars,
-        indicators: data.kline.indicators
+        bars: data.kline?.bars || [],
+        indicators: data.kline?.indicators || null
       }
     }
     
@@ -588,9 +620,55 @@ function closePanel(e) {
   if (!e.target.closest('.period-wrapper')) {
     showPeriodPanel.value = false
   }
+  if (!e.target.closest('.datasource-wrapper')) {
+    showDatasourcePanel.value = false
+  }
+}
+
+// 加载数据源配置
+async function loadDatasourceConfig() {
+  try {
+    const data = await fetchApi('/api/datasource')
+    if (data.ok) {
+      dataSource.value = data.current
+      availableDatasources.value = data.available.map(ds => {
+        const labels = {
+          'legacy': { name: 'Legacy', desc: '腾讯/新浪免费源' },
+          'akshare': { name: 'AkShare', desc: '开源金融数据库' },
+          'tushare': { name: 'Tushare', desc: '专业金融数据' }
+        }
+        return { value: ds, ...labels[ds] }
+      })
+    }
+  } catch (e) {
+    console.error('加载数据源配置失败:', e)
+  }
+}
+
+// 切换数据源
+async function switchDatasource(source) {
+  try {
+    const data = await fetchApi('/api/datasource', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ source })
+    })
+    
+    if (data.ok) {
+      dataSource.value = data.data_source
+      showDatasourcePanel.value = false
+      // 重新加载数据
+      loadAll()
+    } else {
+      alert('切换失败: ' + data.error)
+    }
+  } catch (e) {
+    alert('切换失败: ' + e.message)
+  }
 }
 
 onMounted(() => {
+  loadDatasourceConfig()
   loadAll()
   if (autoRefresh.value) {
     timer = setInterval(refreshQuote, refreshInterval.value)
@@ -915,6 +993,92 @@ header .sub {
   border-color: var(--accent);
 }
 
+/* 数据源切换 */
+.datasource-wrapper {
+  position: relative;
+}
+
+.datasource-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  background: var(--card2);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.datasource-btn:hover {
+  border-color: var(--accent);
+}
+
+.ds-icon {
+  font-size: 14px;
+}
+
+.ds-label {
+  font-size: 12px;
+  color: var(--text);
+}
+
+.datasource-panel {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  margin-top: 4px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  z-index: 1000;
+  min-width: 200px;
+  overflow: hidden;
+}
+
+.ds-title {
+  padding: 10px 12px;
+  font-size: 11px;
+  color: var(--muted);
+  border-bottom: 1px solid var(--line);
+  font-weight: bold;
+}
+
+.ds-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.ds-item:hover {
+  background: var(--card2);
+}
+
+.ds-item.active {
+  background: rgba(88, 166, 255, 0.1);
+}
+
+.ds-name {
+  font-size: 13px;
+  color: var(--text);
+  font-weight: 500;
+}
+
+.ds-desc {
+  font-size: 11px;
+  color: var(--muted);
+  margin-left: auto;
+}
+
+.ds-check {
+  color: var(--accent);
+  font-weight: bold;
+}
+
 /* 刷新设置 */
 .refresh-settings {
   display: flex;
@@ -1107,6 +1271,11 @@ main {
   overflow-y: auto;
   height: 100%;
   min-height: 0;
+}
+
+/* 左栏卡片保持自然高度，内容超出时由 col-left 整体滚动，避免被压缩截断 */
+.col-left > * {
+  flex-shrink: 0;
 }
 
 .col-center {

@@ -5,7 +5,6 @@
 
 支持数据源：
   - tushare: 专业级数据，需要 token（推荐）
-  - akshare: 免费开源，数据全面
   - legacy: 原有免费数据源（腾讯/新浪）
 """
 import os
@@ -30,7 +29,7 @@ app = Flask(__name__, static_folder=STATIC_DIR, static_url_path="")
 CORS(app)
 
 # 数据源配置
-DATA_SOURCE = os.environ.get('DATA_SOURCE', 'legacy')  # tushare / akshare / legacy
+DATA_SOURCE = os.environ.get('DATA_SOURCE', 'legacy')  # tushare / legacy
 data_source = None
 
 def get_data_source():
@@ -198,7 +197,8 @@ def future_realtime(sina_symbol):
 # ----------------------------------------------------------------------------
 # K 线 / 分时
 # ----------------------------------------------------------------------------
-STOCK_SCALE = {"day": 240, "week": 1200, "month": 6000, "5": 5, "15": 15, "30": 30, "60": 60}
+STOCK_SCALE = {"day": 240, "week": 1200, "month": 6000,
+               "1": 1, "2": 2, "3": 3, "5": 5, "10": 10, "15": 15, "30": 30, "60": 60}
 
 
 def stock_kline(tencent_code, period, limit):
@@ -212,6 +212,9 @@ def stock_kline(tencent_code, period, limit):
         data = json.loads(txt)
     except Exception as e:  # noqa
         return None, "parse error: " + str(e)
+    # 数据源对港股/美股或不支持的周期可能返回 null / 非列表，需兜底
+    if not isinstance(data, list) or not data:
+        return None, "无K线数据（数据源未返回）"
     bars = [{"date": b["day"], "open": _f(b["open"]), "high": _f(b["high"]),
              "low": _f(b["low"]), "close": _f(b["close"]), "volume": _f(b["volume"])}
             for b in data]
@@ -232,6 +235,8 @@ def future_kline(sina_symbol, period, limit):
         data = json.loads(txt)
     except Exception as e:  # noqa
         return None, "parse error: " + str(e)
+    if not isinstance(data, list) or not data:
+        return None, "无K线数据（数据源未返回）"
     if period in ("5", "15", "30", "60"):
         bars = [{"date": b["d"], "open": _f(b["o"]), "high": _f(b["h"]),
                  "low": _f(b["l"]), "close": _f(b["c"]), "volume": _f(b["v"])} for b in data]
@@ -251,6 +256,8 @@ def stock_minute(tencent_code):
         node = data["data"][tencent_code]["data"]["data"]
     except Exception as e:  # noqa
         return None, "parse error: " + str(e)
+    if not isinstance(node, list) or not node:
+        return None, "无分时数据（数据源未返回）"
     out = []
     for row in node:
         parts = row.split()
@@ -269,6 +276,8 @@ def future_minute(sina_symbol):
         data = json.loads(txt)
     except Exception as e:  # noqa
         return None, "parse error: " + str(e)
+    if not isinstance(data, list) or not data:
+        return None, "无分时数据（数据源未返回）"
     out = [{"time": b["d"], "price": _f(b["c"]), "avg": None} for b in data]
     return out, None
 
@@ -620,7 +629,7 @@ def api_analysis():
                 "volume": quote.get("volume"), "amount": quote.get("amount"),
                 "open": quote.get("open"), "preclose": quote.get("preclose"),
                 "high": quote.get("high"), "low": quote.get("low"),
-                "note": "估值/财报深度数据可接入 AkShare / Tushare 扩展",
+                "note": "估值/财报深度数据可接入 Tushare 扩展",
             }
     else:
         fundamentals = {"note": "期货为价格驱动品种，无传统基本面（PE/ROE 不适用）",
@@ -648,7 +657,7 @@ def api_analysis():
                 "amount": quote.get("amount"), "volume": quote.get("volume"),
                 "turnover": quote.get("turnover"),
                 "outer": quote.get("outer"), "inner": quote.get("inner"),
-                "main_net": None, "note": "主力净流入需接入 AkShare 沪深股通/主力资金扩展",
+                "main_net": None, "note": "主力净流入需接入 Tushare 沪深股通/主力资金扩展",
             }
     else:
         funds = {
@@ -747,6 +756,60 @@ def api_config():
         "ai_enabled": os.environ.get('DEEPSEEK_API_KEY') != '',
         "model": os.environ.get('DEEPSEEK_MODEL', 'deepseek-chat'),
     })
+
+
+@app.route("/api/datasource", methods=["GET", "POST"])
+def api_datasource():
+    """数据源管理"""
+    global DATA_SOURCE, data_source
+    
+    if request.method == "GET":
+        # 获取当前数据源和可用数据源
+        available = ['legacy']
+        try:
+            import akshare
+            available.append('akshare')
+        except ImportError:
+            pass
+        try:
+            import tushare
+            if os.environ.get('TUSHARE_TOKEN'):
+                available.append('tushare')
+        except ImportError:
+            pass
+        
+        return jsonify({
+            "ok": True,
+            "current": DATA_SOURCE,
+            "available": available
+        })
+    
+    # POST - 切换数据源
+    data = request.json
+    new_source = data.get('source')
+    
+    if new_source not in ['legacy', 'akshare', 'tushare']:
+        return jsonify({"ok": False, "error": "无效的数据源"})
+    
+    # 检查数据源是否可用
+    if new_source == 'akshare':
+        try:
+            import akshare
+        except ImportError:
+            return jsonify({"ok": False, "error": "未安装 akshare"})
+    elif new_source == 'tushare':
+        try:
+            import tushare
+            if not os.environ.get('TUSHARE_TOKEN'):
+                return jsonify({"ok": False, "error": "未配置 TUSHARE_TOKEN"})
+        except ImportError:
+            return jsonify({"ok": False, "error": "未安装 tushare"})
+    
+    # 切换数据源
+    DATA_SOURCE = new_source
+    data_source = None  # 重置数据源实例，下次使用时会重新创建
+    
+    return jsonify({"ok": True, "data_source": DATA_SOURCE})
 
 
 # ----------------------------------------------------------------------------

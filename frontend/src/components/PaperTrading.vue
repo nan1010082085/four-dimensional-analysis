@@ -256,12 +256,25 @@ watch(() => props.signal, (newSignal) => {
   }
 }, { deep: true })
 
-// 监听价格变化，自动更新止损止盈
+// 记录已自动填入止损止盈的股票，切换股票后允许重新填入
+let lastFillCode = ''
+
+// 切换股票代码时，重置止损止盈（让价格watch按新价格重新计算）
+watch(() => props.code, () => {
+  lastFillCode = ''
+  stopLoss.value = null
+  takeProfit.value = null
+  tradeQty.value = defaultQty.value
+})
+
+// 监听价格变化，自动填入止损止盈（每个股票首次到达价格时填入，之后尊重手动修改）
 watch(() => props.quote?.price, (newPrice) => {
-  if (newPrice && !stopLoss.value) {
+  if (!newPrice) return
+  if (lastFillCode !== props.code || !stopLoss.value) {
     stopLoss.value = parseFloat((newPrice * (1 - defaultStopLoss.value / 100)).toFixed(2))
     takeProfit.value = parseFloat((newPrice * (1 + defaultTakeProfit.value / 100)).toFixed(2))
     tradeQty.value = defaultQty.value
+    lastFillCode = props.code
   }
 }, { immediate: true })
 
