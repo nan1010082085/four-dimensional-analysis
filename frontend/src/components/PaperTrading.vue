@@ -86,6 +86,15 @@
           <label>默认数量</label>
           <input v-model.number="defaultQty" type="number" step="100" placeholder="100" />
         </div>
+        <div class="setting-row">
+          <label>自动交易</label>
+          <select v-model="autoTradeMode">
+            <option value="manual">手动确认</option>
+            <option value="auto_buy">自动买入</option>
+            <option value="auto_sell">自动卖出</option>
+            <option value="auto_all">全自动</option>
+          </select>
+        </div>
       </div>
     </div>
     
@@ -202,6 +211,7 @@ const defaultStopLoss = ref(2)
 const defaultTakeProfit = ref(5)
 const riskPerTrade = ref(2)
 const defaultQty = ref(100)
+const autoTradeMode = ref('manual') // manual / auto_buy / auto_sell / auto_all
 
 const hasPosition = computed(() => {
   return status.value.positions.some(p => p.code === props.code)
@@ -216,6 +226,44 @@ const takeProfitPlaceholder = computed(() => {
   if (!props.quote?.price) return '止盈价'
   return (props.quote.price * (1 + defaultTakeProfit.value / 100)).toFixed(2)
 })
+
+// 监听信号变化，自动填入止损止盈
+watch(() => props.signal, (newSignal) => {
+  if (newSignal) {
+    // 自动填入止损止盈
+    if (newSignal.stop_loss) {
+      stopLoss.value = newSignal.stop_loss
+    } else if (props.quote?.price) {
+      stopLoss.value = parseFloat((props.quote.price * (1 - defaultStopLoss.value / 100)).toFixed(2))
+    }
+    
+    if (newSignal.take_profit_1) {
+      takeProfit.value = newSignal.take_profit_1
+    } else if (props.quote?.price) {
+      takeProfit.value = parseFloat((props.quote.price * (1 + defaultTakeProfit.value / 100)).toFixed(2))
+    }
+    
+    // 自动交易
+    if (autoTradeMode.value === 'auto_all' || 
+        (autoTradeMode.value === 'auto_buy' && newSignal.type === 'buy') ||
+        (autoTradeMode.value === 'auto_sell' && newSignal.type === 'sell')) {
+      if (newSignal.type === 'buy' && !hasPosition.value) {
+        executeBuy()
+      } else if (newSignal.type === 'sell' && hasPosition.value) {
+        executeSell()
+      }
+    }
+  }
+}, { deep: true })
+
+// 监听价格变化，自动更新止损止盈
+watch(() => props.quote?.price, (newPrice) => {
+  if (newPrice && !stopLoss.value) {
+    stopLoss.value = parseFloat((newPrice * (1 - defaultStopLoss.value / 100)).toFixed(2))
+    takeProfit.value = parseFloat((newPrice * (1 + defaultTakeProfit.value / 100)).toFixed(2))
+    tradeQty.value = defaultQty.value
+  }
+}, { immediate: true })
 
 // 加载状态
 async function loadStatus() {
@@ -330,13 +378,6 @@ function formatTime(time) {
   if (!time) return ''
   return time.substring(5, 16)
 }
-
-watch(() => props.signal, (newSignal) => {
-  if (newSignal) {
-    if (newSignal.stop_loss) stopLoss.value = newSignal.stop_loss
-    if (newSignal.take_profit_1) takeProfit.value = newSignal.take_profit_1
-  }
-}, { deep: true })
 
 onMounted(() => {
   loadStatus()

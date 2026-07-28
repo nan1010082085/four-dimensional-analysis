@@ -41,6 +41,8 @@ const props = defineProps({
   kind: String
 })
 
+const emit = defineEmits(['signal'])
+
 const loading = ref(false)
 const analysis = ref('')
 const error = ref('')
@@ -55,6 +57,8 @@ async function requestAnalysis() {
     
     if (data.ok) {
       analysis.value = data.analysis
+      // 提取信号方向
+      extractSignalDirection(data.analysis)
     } else {
       error.value = data.error || '分析失败'
     }
@@ -73,6 +77,53 @@ function formatAnalysis(text) {
     .replace(/\*(.*?)\*/g, '<em>$1</em>')
     .replace(/^#{1,3}\s+(.*?)$/gm, '<h4>$1</h4>')
     .replace(/^[-*]\s+(.*?)$/gm, '<li>$1</li>')
+}
+
+// 提取信号方向
+function extractSignalDirection(text) {
+  if (!text) return
+  
+  const buyKeywords = ['买入', '做多', '看多', '买入信号', '建议买入', '可以买入']
+  const sellKeywords = ['卖出', '做空', '看空', '卖出信号', '建议卖出', '可以卖出']
+  const holdKeywords = ['观望', '持有', '等待', '观望为主', '暂时观望']
+  
+  let direction = null
+  
+  for (const keyword of buyKeywords) {
+    if (text.includes(keyword)) {
+      direction = 'buy'
+      break
+    }
+  }
+  
+  if (!direction) {
+    for (const keyword of sellKeywords) {
+      if (text.includes(keyword)) {
+        direction = 'sell'
+        break
+      }
+    }
+  }
+  
+  if (!direction) {
+    for (const keyword of holdKeywords) {
+      if (text.includes(keyword)) {
+        direction = 'hold'
+        break
+      }
+    }
+  }
+  
+  // 发送信号给父组件
+  if (direction) {
+    emit('signal', {
+      type: direction,
+      reason: `AI分析: ${direction === 'buy' ? '看多' : direction === 'sell' ? '看空' : '观望'}`,
+      price: null,
+      stop_loss: null,
+      take_profit: null
+    })
+  }
 }
 
 // 监听代码变化，自动分析

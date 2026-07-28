@@ -1,7 +1,20 @@
 <template>
   <div class="risk-panel">
-    <h3>风险控制</h3>
+    <div class="panel-header">
+      <h3>
+        <span class="risk-icon">🛡️</span>
+        风险控制
+      </h3>
+      <button v-if="closable" class="close-btn" @click="$emit('close')">×</button>
+    </div>
     
+    <!-- 风险警告 -->
+    <div v-if="riskWarning" class="risk-warning" :class="riskWarning.level">
+      <span class="warning-icon">{{ riskWarning.level === 'high' ? '⚠️' : '💡' }}</span>
+      <span>{{ riskWarning.message }}</span>
+    </div>
+    
+    <!-- 止损止盈计算器 -->
     <div class="risk-section">
       <div class="section-title">止损止盈计算器</div>
       <div class="input-row">
@@ -47,6 +60,7 @@
       </div>
     </div>
     
+    <!-- 仓位计算器 -->
     <div class="risk-section">
       <div class="section-title">仓位计算器</div>
       <div class="input-row">
@@ -84,6 +98,7 @@
       </div>
     </div>
     
+    <!-- ATR止损参考 -->
     <div class="risk-section">
       <div class="section-title">ATR止损参考</div>
       <div class="atr-info" v-if="atr">
@@ -110,8 +125,15 @@ import { ref, computed, watch } from 'vue'
 
 const props = defineProps({
   quote: Object,
-  kline: Object
+  kline: Object,
+  signal: Object,
+  closable: {
+    type: Boolean,
+    default: false
+  }
 })
+
+defineEmits(['close'])
 
 const entryPrice = ref(null)
 const stopLossPct = ref(2)
@@ -119,50 +141,64 @@ const takeProfitPct = ref(5)
 const totalCapital = ref(100000)
 const riskPerTrade = ref(2)
 
-// 止损价
+// 风险警告
+const riskWarning = computed(() => {
+  if (!props.quote) return null
+  
+  const changePct = props.quote.changepct
+  if (changePct && Math.abs(changePct) > 5) {
+    return {
+      level: 'high',
+      message: `波动较大: ${changePct > 0 ? '+' : ''}${changePct}%，注意风险`
+    }
+  }
+  
+  if (props.signal?.type === 'sell') {
+    return {
+      level: 'high',
+      message: 'AI发出卖出信号，注意止损'
+    }
+  }
+  
+  return null
+})
+
 const stopLossPrice = computed(() => {
   if (!entryPrice.value) return '--'
   return (entryPrice.value * (1 - stopLossPct.value / 100)).toFixed(2)
 })
 
-// 止盈价
 const takeProfitPrice = computed(() => {
   if (!entryPrice.value) return '--'
   return (entryPrice.value * (1 + takeProfitPct.value / 100)).toFixed(2)
 })
 
-// 盈亏比
 const profitLossRatio = computed(() => {
   if (!entryPrice.value) return 0
   return (takeProfitPct.value / stopLossPct.value).toFixed(1)
 })
 
-// 最大亏损
 const maxLoss = computed(() => {
   if (!totalCapital.value) return 0
   return (totalCapital.value * riskPerTrade.value / 100).toFixed(0)
 })
 
-// 仓位大小（股数）
 const positionSize = computed(() => {
   if (!entryPrice.value || !maxLoss.value) return 0
   const lossPerShare = entryPrice.value * stopLossPct.value / 100
   return Math.floor(maxLoss.value / lossPerShare)
 })
 
-// 仓位金额
 const positionValue = computed(() => {
   if (!entryPrice.value || !positionSize.value) return 0
   return (entryPrice.value * positionSize.value).toFixed(0)
 })
 
-// 仓位占比
 const positionPct = computed(() => {
   if (!totalCapital.value || !positionValue.value) return 0
   return ((positionValue.value / totalCapital.value) * 100).toFixed(1)
 })
 
-// ATR计算
 const atr = computed(() => {
   if (!props.kline?.bars || props.kline.bars.length < 15) return null
   
@@ -185,7 +221,6 @@ const atr = computed(() => {
   return (sum / 14).toFixed(2)
 })
 
-// ATR止损价
 const atrStop1 = computed(() => {
   if (!props.quote?.price || !atr.value) return '--'
   return (props.quote.price - parseFloat(atr.value)).toFixed(2)
@@ -196,7 +231,6 @@ const atrStop2 = computed(() => {
   return (props.quote.price - parseFloat(atr.value) * 2).toFixed(2)
 })
 
-// 自动填入当前价格
 watch(() => props.quote, (newQuote) => {
   if (newQuote?.price && !entryPrice.value) {
     entryPrice.value = newQuote.price
@@ -215,12 +249,67 @@ watch(() => props.quote, (newQuote) => {
   gap: 12px;
 }
 
-.risk-panel h3 {
+.panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.panel-header h3 {
   margin: 0;
   font-size: 13px;
   color: var(--accent);
-  border-left: 3px solid var(--accent);
-  padding-left: 8px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.risk-icon {
+  font-size: 16px;
+}
+
+.close-btn {
+  width: 28px;
+  height: 28px;
+  background: transparent;
+  border: 1px solid var(--line);
+  color: var(--muted);
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.close-btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.risk-warning {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: 6px;
+  font-size: 12px;
+}
+
+.risk-warning.high {
+  background: rgba(239, 35, 42, 0.1);
+  border: 1px solid rgba(239, 35, 42, 0.3);
+  color: #ef232a;
+}
+
+.risk-warning.low {
+  background: rgba(210, 153, 34, 0.1);
+  border: 1px solid rgba(210, 153, 34, 0.3);
+  color: #d29922;
+}
+
+.warning-icon {
+  font-size: 14px;
 }
 
 .risk-section {

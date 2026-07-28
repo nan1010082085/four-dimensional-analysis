@@ -106,10 +106,20 @@
         </div>
       </div>
       
+      <!-- AI信号方向 -->
+      <div v-if="aiSignalDirection" class="signal-direction" :class="aiSignalDirection">
+        {{ aiSignalDirection === 'buy' ? '▲ 看多' : aiSignalDirection === 'sell' ? '▼ 看空' : '◆ 观望' }}
+      </div>
+      
       <div id="status">
         <span class="dot" :class="{ live: isLive }"></span>
         <span>{{ statusText }}</span>
       </div>
+      
+      <!-- 风险控制按钮 -->
+      <button class="toolbar-btn risk-btn" @click="showRiskPanel = !showRiskPanel" title="风险控制">
+        🛡️ 风控
+      </button>
       
       <!-- 模拟盘按钮 -->
       <button class="toolbar-btn" @click="showPaperTrading = !showPaperTrading" title="模拟盘">
@@ -121,6 +131,13 @@
         ?
       </button>
     </header>
+
+    <!-- 风险控制面板 -->
+    <div v-if="showRiskPanel" class="risk-overlay" @click.self="showRiskPanel = false">
+      <div class="risk-panel-wrapper">
+        <RiskPanel :quote="quote" :kline="kline" :signal="currentSignal" @close="showRiskPanel = false" />
+      </div>
+    </div>
 
     <!-- 模拟盘面板 -->
     <div v-if="showPaperTrading" class="paper-overlay" @click.self="showPaperTrading = false">
@@ -175,11 +192,10 @@
         </div>
       </div>
       
-      <!-- 右栏：AI分析 + 模拟盘 + 风险控制 -->
+      <!-- 右栏：AI分析 + 风险控制 -->
       <div class="col-right">
-        <AIAnalysis :code="code" :period="period" :kind="kind" />
-        <PaperTrading :code="code" :quote="quote" :signal="currentSignal" />
-        <RiskPanel :quote="quote" :kline="kline" />
+        <AIAnalysis :code="code" :period="period" :kind="kind" @signal="handleAISignal" />
+        <RiskPanel :quote="quote" :kline="kline" :signal="currentSignal" />
       </div>
     </main>
   </div>
@@ -217,6 +233,7 @@ const showHelp = ref(false)
 const showPanel = ref(false)
 const showPeriodPanel = ref(false)
 const showPaperTrading = ref(false)
+const showRiskPanel = ref(false)
 const activeTab = ref('hot')
 const searchText = ref('sh600519')
 const currentSignal = ref(null)
@@ -487,6 +504,18 @@ function handleSignal(signal) {
   signalStockCode.value = signal.code
   signalStockName.value = signal.name
 }
+
+// 处理AI分析信号
+function handleAISignal(signal) {
+  if (signal) {
+    currentSignal.value = signal
+    signalStockCode.value = code.value
+    signalStockName.value = quote.value?.name || code.value
+  }
+}
+
+// AI信号方向
+const aiSignalDirection = ref(null) // 'buy' / 'sell' / 'hold'
 
 async function loadAll() {
   setStatus('加载中…', false)
@@ -954,6 +983,65 @@ header .sub {
 .toolbar-btn:hover {
   border-color: var(--accent);
   background: rgba(88, 166, 255, 0.1);
+}
+
+/* AI信号方向 */
+.signal-direction {
+  padding: 4px 10px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: bold;
+}
+
+.signal-direction.buy {
+  background: rgba(20, 177, 67, 0.2);
+  color: #14b143;
+  border: 1px solid rgba(20, 177, 67, 0.4);
+}
+
+.signal-direction.sell {
+  background: rgba(239, 35, 42, 0.2);
+  color: #ef232a;
+  border: 1px solid rgba(239, 35, 42, 0.4);
+}
+
+.signal-direction.hold {
+  background: rgba(88, 166, 255, 0.2);
+  color: #58a6ff;
+  border: 1px solid rgba(88, 166, 255, 0.4);
+}
+
+.risk-btn {
+  position: relative;
+}
+
+/* 风险控制面板 */
+.risk-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 9998;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.risk-panel-wrapper {
+  width: 500px;
+  max-height: 80vh;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  overflow-y: auto;
+  animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: scale(0.95); }
+  to { opacity: 1; transform: scale(1); }
 }
 
 /* 模拟盘面板 */
