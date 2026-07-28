@@ -50,15 +50,41 @@
         </div>
       </div>
       
-      <div class="seg">
-        <button 
-          v-for="p in periods" 
-          :key="p.value" 
-          :class="{ active: period === p.value }"
-          @click="period = p.value; loadAll()"
-        >
-          {{ p.label }}
-        </button>
+      <!-- 周期选择面板 -->
+      <div class="period-wrapper">
+        <div class="period-btn" @click="showPeriodPanel = !showPeriodPanel">
+          <span>{{ currentPeriodLabel }}</span>
+          <span class="arrow">▼</span>
+        </div>
+        <div v-if="showPeriodPanel" class="period-panel" @click.stop>
+          <div class="period-group">
+            <div class="group-title">分时</div>
+            <div class="group-items">
+              <button :class="{ active: period === 'minute' }" @click="selectPeriod('minute')">分时</button>
+            </div>
+          </div>
+          <div class="period-group">
+            <div class="group-title">分钟K线</div>
+            <div class="group-items">
+              <button :class="{ active: period === '1' }" @click="selectPeriod('1')">1分</button>
+              <button :class="{ active: period === '2' }" @click="selectPeriod('2')">2分</button>
+              <button :class="{ active: period === '3' }" @click="selectPeriod('3')">3分</button>
+              <button :class="{ active: period === '5' }" @click="selectPeriod('5')">5分</button>
+              <button :class="{ active: period === '10' }" @click="selectPeriod('10')">10分</button>
+              <button :class="{ active: period === '15' }" @click="selectPeriod('15')">15分</button>
+              <button :class="{ active: period === '30' }" @click="selectPeriod('30')">30分</button>
+              <button :class="{ active: period === '60' }" @click="selectPeriod('60')">60分</button>
+            </div>
+          </div>
+          <div class="period-group">
+            <div class="group-title">日K线</div>
+            <div class="group-items">
+              <button :class="{ active: period === 'day' }" @click="selectPeriod('day')">日K</button>
+              <button :class="{ active: period === 'week' }" @click="selectPeriod('week')">周K</button>
+              <button :class="{ active: period === 'month' }" @click="selectPeriod('month')">月K</button>
+            </div>
+          </div>
+        </div>
       </div>
       
       <!-- 刷新时间设置 -->
@@ -117,11 +143,16 @@
       <!-- 中栏：K线图表 -->
       <div class="col-center">
         <div class="card chart-card">
-          <h2>技术面 <small>K线 + MA + 量 + MACD + KDJ + BOLL</small></h2>
+          <h2>
+            <span class="chart-icon">📊</span>
+            {{ quote?.name || code }} 
+            <small>{{ currentPeriodLabel }} · 技术分析</small>
+          </h2>
           <KlineChart 
-            v-if="period !== 'minute'" 
+            v-if="!isMinutePeriod" 
             :bars="kline.bars" 
             :indicators="kline.indicators" 
+            :period="period"
           />
           <MinuteChart 
             v-else 
@@ -171,12 +202,44 @@ const isLive = ref(false)
 const statusText = ref('就绪')
 const showHelp = ref(false)
 const showPanel = ref(false)
+const showPeriodPanel = ref(false)
 const activeTab = ref('hot')
 const searchText = ref('sh600519')
 const currentSignal = ref(null)
 const signalStockCode = ref('')
 const signalStockName = ref('')
 let timer = null
+
+// 周期标签映射
+const periodLabels = {
+  'minute': '分时',
+  '1': '1分钟',
+  '2': '2分钟',
+  '3': '3分钟',
+  '5': '5分钟',
+  '10': '10分钟',
+  '15': '15分钟',
+  '30': '30分钟',
+  '60': '60分钟',
+  'day': '日K',
+  'week': '周K',
+  'month': '月K'
+}
+
+// 当前周期标签
+const currentPeriodLabel = computed(() => periodLabels[period.value] || '日K')
+
+// 是否为分钟周期
+const isMinutePeriod = computed(() => {
+  return ['minute', '1', '2', '3', '5', '10', '15', '30', '60'].includes(period.value)
+})
+
+// 选择周期
+function selectPeriod(p) {
+  period.value = p
+  showPeriodPanel.value = false
+  loadAll()
+}
 
 // 股票/期货分类数据
 const tabs = [
@@ -480,6 +543,9 @@ function closePanel(e) {
   if (!e.target.closest('.selector-wrapper')) {
     showPanel.value = false
   }
+  if (!e.target.closest('.period-wrapper')) {
+    showPeriodPanel.value = false
+  }
 }
 
 onMounted(() => {
@@ -700,24 +766,85 @@ header .sub {
   color: var(--muted);
 }
 
-/* 周期选择 */
-.seg {
+/* 周期选择面板 */
+.period-wrapper {
+  position: relative;
+}
+
+.period-btn {
   display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  background: var(--card2);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  cursor: pointer;
+  min-width: 80px;
+}
+
+.period-btn:hover {
+  border-color: var(--accent);
+}
+
+.period-btn .arrow {
+  font-size: 10px;
+  color: var(--muted);
+}
+
+.period-panel {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  margin-top: 4px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  z-index: 1000;
+  padding: 12px;
+  min-width: 200px;
+}
+
+.period-group {
+  margin-bottom: 10px;
+}
+
+.period-group:last-child {
+  margin-bottom: 0;
+}
+
+.group-title {
+  font-size: 10px;
+  color: var(--muted);
+  margin-bottom: 6px;
+  text-transform: uppercase;
+}
+
+.group-items {
+  display: flex;
+  flex-wrap: wrap;
   gap: 4px;
 }
 
-.seg button {
-  padding: 5px 9px;
+.group-items button {
+  padding: 4px 10px;
   background: var(--card2);
   border: 1px solid var(--line);
   color: var(--muted);
-  border-radius: 6px;
+  border-radius: 4px;
   cursor: pointer;
-  font-size: 12px;
+  font-size: 11px;
 }
 
-.seg button.active {
+.group-items button:hover {
   color: var(--text);
+  border-color: var(--accent);
+}
+
+.group-items button.active {
+  background: var(--accent);
+  color: #fff;
   border-color: var(--accent);
 }
 
@@ -869,5 +996,9 @@ main {
   color: var(--muted);
   font-weight: normal;
   font-size: 11px;
+}
+
+.chart-icon {
+  font-size: 16px;
 }
 </style>
