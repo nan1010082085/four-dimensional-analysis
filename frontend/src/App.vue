@@ -482,7 +482,18 @@ const stockLists = {
 }
 
 const currentList = computed(() => {
-  return stockLists[activeTab.value] || []
+  const list = stockLists[activeTab.value] || []
+  
+  // 如果有搜索文本，过滤列表
+  if (searchText.value) {
+    const search = searchText.value.toLowerCase()
+    return list.filter(item => 
+      item.name.toLowerCase().includes(search) || 
+      item.code.toLowerCase().includes(search)
+    )
+  }
+  
+  return list
 })
 
 const currentName = computed(() => {
