@@ -111,10 +111,23 @@
         <span>{{ statusText }}</span>
       </div>
       
+      <!-- 模拟盘按钮 -->
+      <button class="toolbar-btn" @click="showPaperTrading = !showPaperTrading" title="模拟盘">
+        💰 模拟盘
+      </button>
+      
+      <!-- 帮助按钮 -->
       <button class="help-btn" @click="showHelp = true" title="名词解释 & 交易规则">
         ?
       </button>
     </header>
+
+    <!-- 模拟盘面板 -->
+    <div v-if="showPaperTrading" class="paper-overlay" @click.self="showPaperTrading = false">
+      <div class="paper-panel">
+        <PaperTrading :code="code" :quote="quote" :signal="currentSignal" @close="showPaperTrading = false" />
+      </div>
+    </div>
 
     <!-- 帮助面板 -->
     <HelpPanel :show="showHelp" @close="showHelp = false" />
@@ -203,6 +216,7 @@ const statusText = ref('就绪')
 const showHelp = ref(false)
 const showPanel = ref(false)
 const showPeriodPanel = ref(false)
+const showPaperTrading = ref(false)
 const activeTab = ref('hot')
 const searchText = ref('sh600519')
 const currentSignal = ref(null)
@@ -596,6 +610,31 @@ body {
   font-size: 13px;
 }
 
+/* 全局滚动条样式 */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(139, 148, 158, 0.3);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(139, 148, 158, 0.5);
+}
+
+/* Firefox滚动条 */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(139, 148, 158, 0.3) transparent;
+}
+
 .app {
   display: flex;
   flex-direction: column;
@@ -899,6 +938,49 @@ header .sub {
   background: var(--accent);
   color: #fff;
   border-color: var(--accent);
+}
+
+.toolbar-btn {
+  padding: 5px 12px;
+  background: var(--card2);
+  border: 1px solid var(--line);
+  color: var(--text);
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 12px;
+  transition: all 0.2s;
+}
+
+.toolbar-btn:hover {
+  border-color: var(--accent);
+  background: rgba(88, 166, 255, 0.1);
+}
+
+/* 模拟盘面板 */
+.paper-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 9998;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.paper-panel {
+  width: 400px;
+  height: 100vh;
+  background: var(--bg);
+  border-left: 1px solid var(--line);
+  overflow-y: auto;
+  animation: slideInRight 0.3s ease;
+}
+
+@keyframes slideInRight {
+  from { transform: translateX(100%); }
+  to { transform: translateX(0); }
 }
 
 #status {

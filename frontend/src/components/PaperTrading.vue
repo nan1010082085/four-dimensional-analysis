@@ -1,8 +1,11 @@
 <template>
   <div class="paper-trading">
     <div class="panel-header">
-      <h3>模拟盘</h3>
-      <button class="reset-btn" @click="resetPaper" title="重置">↻</button>
+      <h3>💰 模拟盘交易</h3>
+      <div class="header-actions">
+        <button class="reset-btn" @click="resetPaper" title="重置">↻</button>
+        <button class="close-btn" @click="$emit('close')" title="关闭">×</button>
+      </div>
     </div>
     
     <!-- 资金概览 -->
@@ -37,6 +40,55 @@
       </div>
     </div>
     
+    <!-- 交易设置 -->
+    <div class="settings-section">
+      <div class="section-header" @click="showSettings = !showSettings">
+        <span>⚙️ 交易设置</span>
+        <span class="toggle">{{ showSettings ? '▼' : '▶' }}</span>
+      </div>
+      <div v-if="showSettings" class="settings-content">
+        <div class="setting-row">
+          <label>初始资金</label>
+          <input v-model.number="initialCapital" type="number" placeholder="100000" />
+        </div>
+        <div class="setting-row">
+          <label>默认止损</label>
+          <select v-model.number="defaultStopLoss">
+            <option :value="1">1%</option>
+            <option :value="2">2%</option>
+            <option :value="3">3%</option>
+            <option :value="5">5%</option>
+            <option :value="8">8%</option>
+            <option :value="10">10%</option>
+          </select>
+        </div>
+        <div class="setting-row">
+          <label>默认止盈</label>
+          <select v-model.number="defaultTakeProfit">
+            <option :value="3">3%</option>
+            <option :value="5">5%</option>
+            <option :value="8">8%</option>
+            <option :value="10">10%</option>
+            <option :value="15">15%</option>
+            <option :value="20">20%</option>
+          </select>
+        </div>
+        <div class="setting-row">
+          <label>单笔风险</label>
+          <select v-model.number="riskPerTrade">
+            <option :value="1">1%</option>
+            <option :value="2">2%</option>
+            <option :value="3">3%</option>
+            <option :value="5">5%</option>
+          </select>
+        </div>
+        <div class="setting-row">
+          <label>默认数量</label>
+          <input v-model.number="defaultQty" type="number" step="100" placeholder="100" />
+        </div>
+      </div>
+    </div>
+    
     <!-- 快捷交易 -->
     <div class="trade-section">
       <div class="trade-header">
@@ -48,22 +100,22 @@
       <div class="trade-form">
         <div class="form-row">
           <label>数量</label>
-          <input v-model.number="tradeQty" type="number" placeholder="100" step="100" />
+          <input v-model.number="tradeQty" type="number" :step="100" :placeholder="defaultQty" />
         </div>
         <div class="form-row">
-          <label>止损</label>
+          <label>止损价</label>
           <input v-model.number="stopLoss" type="number" :placeholder="stopLossPlaceholder" />
         </div>
         <div class="form-row">
-          <label>止盈</label>
+          <label>止盈价</label>
           <input v-model.number="takeProfit" type="number" :placeholder="takeProfitPlaceholder" />
         </div>
         <div class="trade-buttons">
           <button class="buy-btn" @click="executeBuy" :disabled="!quote">
-            买入
+            买入 {{ quote?.name || '' }}
           </button>
           <button class="sell-btn" @click="executeSell" :disabled="!hasPosition">
-            卖出
+            卖出 {{ quote?.name || '' }}
           </button>
         </div>
       </div>
@@ -84,8 +136,8 @@
               <span>成本: {{ pos.avg_price }}</span>
             </div>
             <div class="pos-row">
-              <span v-if="pos.stop_loss">止损: {{ pos.stop_loss }}</span>
-              <span v-if="pos.take_profit">止盈: {{ pos.take_profit }}</span>
+              <span v-if="pos.stop_loss" class="stop-loss">止损: {{ pos.stop_loss }}</span>
+              <span v-if="pos.take_profit" class="take-profit">止盈: {{ pos.take_profit }}</span>
             </div>
           </div>
         </div>
@@ -108,6 +160,7 @@
               {{ trade.pnl >= 0 ? '+' : '' }}{{ trade.pnl }}
             </span>
           </div>
+          <div v-if="trade.reason" class="trade-reason">{{ trade.reason }}</div>
         </div>
       </div>
     </div>
@@ -124,6 +177,8 @@ const props = defineProps({
   signal: Object
 })
 
+defineEmits(['close'])
+
 const status = ref({
   capital: 100000,
   total_assets: 100000,
@@ -139,6 +194,14 @@ const recentTrades = ref([])
 const tradeQty = ref(100)
 const stopLoss = ref(null)
 const takeProfit = ref(null)
+const showSettings = ref(false)
+
+// 交易设置
+const initialCapital = ref(100000)
+const defaultStopLoss = ref(2)
+const defaultTakeProfit = ref(5)
+const riskPerTrade = ref(2)
+const defaultQty = ref(100)
 
 const hasPosition = computed(() => {
   return status.value.positions.some(p => p.code === props.code)
@@ -146,12 +209,12 @@ const hasPosition = computed(() => {
 
 const stopLossPlaceholder = computed(() => {
   if (!props.quote?.price) return '止损价'
-  return (props.quote.price * 0.97).toFixed(2)
+  return (props.quote.price * (1 - defaultStopLoss.value / 100)).toFixed(2)
 })
 
 const takeProfitPlaceholder = computed(() => {
   if (!props.quote?.price) return '止盈价'
-  return (props.quote.price * 1.05).toFixed(2)
+  return (props.quote.price * (1 + defaultTakeProfit.value / 100)).toFixed(2)
 })
 
 // 加载状态
@@ -182,6 +245,9 @@ async function loadTrades() {
 async function executeBuy() {
   if (!props.quote) return
   
+  const sl = stopLoss.value || parseFloat(stopLossPlaceholder.value)
+  const tp = takeProfit.value || parseFloat(takeProfitPlaceholder.value)
+  
   try {
     const data = await fetchApi('/api/paper/buy', {
       method: 'POST',
@@ -190,9 +256,9 @@ async function executeBuy() {
         code: props.code,
         name: props.quote.name,
         price: props.quote.price,
-        qty: tradeQty.value,
-        stop_loss: stopLoss.value || stopLossPlaceholder.value,
-        take_profit: takeProfit.value || takeProfitPlaceholder.value,
+        qty: tradeQty.value || defaultQty.value,
+        stop_loss: sl,
+        take_profit: tp,
         reason: props.signal ? `AI信号: ${props.signal.reason}` : '手动买入'
       })
     })
@@ -255,19 +321,16 @@ async function resetPaper() {
   }
 }
 
-// 格式化金额
 function formatMoney(val) {
   if (val === undefined || val === null) return '--'
   return Number(val).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
 
-// 格式化时间
 function formatTime(time) {
   if (!time) return ''
   return time.substring(5, 16)
 }
 
-// 监听信号，自动填入止损止盈
 watch(() => props.signal, (newSignal) => {
   if (newSignal) {
     if (newSignal.stop_loss) stopLoss.value = newSignal.stop_loss
@@ -283,82 +346,138 @@ onMounted(() => {
 
 <style scoped>
 .paper-trading {
-  background: var(--card);
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  padding: 12px;
+  padding: 16px;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 12px;
 }
 
 .panel-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--line);
 }
 
 .panel-header h3 {
   margin: 0;
-  font-size: 13px;
+  font-size: 15px;
   color: var(--accent);
-  border-left: 3px solid var(--accent);
-  padding-left: 8px;
 }
 
-.reset-btn {
-  width: 24px;
-  height: 24px;
+.header-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.reset-btn,
+.close-btn {
+  width: 28px;
+  height: 28px;
   background: transparent;
   border: 1px solid var(--line);
   color: var(--muted);
   border-radius: 4px;
   cursor: pointer;
-  font-size: 14px;
+  font-size: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
-.reset-btn:hover {
+.reset-btn:hover,
+.close-btn:hover {
   border-color: var(--accent);
   color: var(--accent);
 }
 
 .stats-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 1fr 1fr 1fr;
   gap: 8px;
 }
 
 .stat-item {
   display: flex;
   flex-direction: column;
-  padding: 8px;
-  background: var(--card2);
-  border-radius: 6px;
+  padding: 10px;
+  background: var(--card);
+  border-radius: 8px;
 }
 
 .stat-label {
   font-size: 10px;
   color: var(--muted);
+  margin-bottom: 4px;
 }
 
 .stat-value {
-  font-size: 13px;
+  font-size: 14px;
   font-weight: bold;
   color: var(--text);
 }
 
-.stat-value.up {
-  color: #ef232a;
+.stat-value.up { color: #ef232a; }
+.stat-value.down { color: #14b143; }
+
+.settings-section {
+  background: var(--card);
+  border-radius: 8px;
+  overflow: hidden;
 }
 
-.stat-value.down {
-  color: #14b143;
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 12px;
+  cursor: pointer;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.section-header:hover {
+  background: var(--card2);
+}
+
+.toggle {
+  font-size: 10px;
+}
+
+.settings-content {
+  padding: 0 12px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.setting-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.setting-row label {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.setting-row input,
+.setting-row select {
+  width: 120px;
+  padding: 4px 8px;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  color: var(--text);
+  border-radius: 4px;
+  font-size: 11px;
 }
 
 .trade-section {
-  background: var(--card2);
+  background: var(--card);
   border-radius: 8px;
-  padding: 10px;
+  padding: 12px;
 }
 
 .trade-header {
@@ -389,7 +508,7 @@ onMounted(() => {
 .form-row label {
   font-size: 11px;
   color: var(--muted);
-  min-width: 30px;
+  min-width: 40px;
 }
 
 .form-row input {
@@ -416,7 +535,7 @@ onMounted(() => {
 .buy-btn,
 .sell-btn {
   flex: 1;
-  padding: 8px;
+  padding: 10px;
   border: none;
   border-radius: 6px;
   cursor: pointer;
@@ -429,18 +548,14 @@ onMounted(() => {
   color: #fff;
 }
 
-.buy-btn:hover:not(:disabled) {
-  opacity: 0.9;
-}
+.buy-btn:hover:not(:disabled) { opacity: 0.9; }
 
 .sell-btn {
   background: linear-gradient(135deg, #14b143 0%, #0e8a35 100%);
   color: #fff;
 }
 
-.sell-btn:hover:not(:disabled) {
-  opacity: 0.9;
-}
+.sell-btn:hover:not(:disabled) { opacity: 0.9; }
 
 .buy-btn:disabled,
 .sell-btn:disabled {
@@ -449,7 +564,7 @@ onMounted(() => {
 }
 
 .section-title {
-  font-size: 11px;
+  font-size: 12px;
   color: var(--muted);
   margin-bottom: 8px;
   font-weight: bold;
@@ -457,6 +572,9 @@ onMounted(() => {
 
 .positions-section,
 .trades-section {
+  background: var(--card);
+  border-radius: 8px;
+  padding: 12px;
   max-height: 200px;
   overflow-y: auto;
 }
@@ -502,19 +620,19 @@ onMounted(() => {
   color: var(--muted);
 }
 
-.trade-item.buy .trade-type {
-  color: #ef232a;
+.stop-loss { color: #14b143; }
+.take-profit { color: #ef232a; }
+
+.trade-item.buy .trade-type { color: #ef232a; }
+.trade-item.sell .trade-type { color: #14b143; }
+
+.trade-reason {
+  margin-top: 4px;
+  font-size: 10px;
+  color: var(--muted);
+  font-style: italic;
 }
 
-.trade-item.sell .trade-type {
-  color: #14b143;
-}
-
-.up {
-  color: #ef232a;
-}
-
-.down {
-  color: #14b143;
-}
+.up { color: #ef232a; }
+.down { color: #14b143; }
 </style>

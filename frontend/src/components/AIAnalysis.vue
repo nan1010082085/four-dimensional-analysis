@@ -1,42 +1,18 @@
 <template>
   <div class="card ai-card">
     <h2>
+      <span class="ai-icon">🤖</span>
       AI 量化分析 
-      <small>DeepSeek 量化策略</small>
+      <small>DeepSeek 智能策略</small>
       <button 
         class="ai-btn" 
         :class="{ loading: loading }"
         :disabled="loading"
         @click="requestAnalysis"
       >
-        {{ loading ? '分析中...' : '开始分析' }}
+        {{ loading ? '分析中...' : '重新分析' }}
       </button>
     </h2>
-    
-    <div class="analysis-types">
-      <div class="type-group">
-        <span class="group-label">基础分析</span>
-        <button 
-          v-for="t in basicTypes" 
-          :key="t.value"
-          :class="{ active: analysisType === t.value }"
-          @click="analysisType = t.value"
-        >
-          {{ t.label }}
-        </button>
-      </div>
-      <div class="type-group">
-        <span class="group-label">量化策略</span>
-        <button 
-          v-for="t in quantTypes" 
-          :key="t.value"
-          :class="{ active: analysisType === t.value }"
-          @click="analysisType = t.value"
-        >
-          {{ t.label }}
-        </button>
-      </div>
-    </div>
     
     <div v-if="error" class="error">{{ error }}</div>
     
@@ -45,13 +21,18 @@
     </div>
     
     <div v-else-if="!loading" class="placeholder">
-      点击「开始分析」获取 AI 量化分析报告
+      正在加载 AI 分析...
+    </div>
+    
+    <div v-if="loading" class="loading-indicator">
+      <div class="loading-spinner"></div>
+      <span>AI 正在分析 {{ code }}...</span>
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref, defineProps } from 'vue'
+import { ref, watch, onMounted } from 'vue'
 import { fetchApi } from '../api.js'
 
 const props = defineProps({
@@ -63,29 +44,13 @@ const props = defineProps({
 const loading = ref(false)
 const analysis = ref('')
 const error = ref('')
-const analysisType = ref('comprehensive')
-
-const basicTypes = [
-  { label: '综合分析', value: 'comprehensive' },
-  { label: '技术分析', value: 'technical' },
-  { label: '基本面分析', value: 'fundamental' },
-  { label: '资金分析', value: 'funds' },
-]
-
-const quantTypes = [
-  { label: '趋势跟踪', value: 'trend' },
-  { label: '均值回归', value: 'mean_reversion' },
-  { label: '统计套利', value: 'statistical_arbitrage' },
-  { label: '风险控制', value: 'risk_control' },
-]
 
 async function requestAnalysis() {
   loading.value = true
   error.value = ''
-  analysis.value = ''
   
   try {
-    const url = `/api/ai-analysis?code=${encodeURIComponent(props.code)}&period=${props.period}&type=${analysisType.value}`
+    const url = `/api/ai-analysis?code=${encodeURIComponent(props.code)}&period=${props.period}&type=comprehensive`
     const data = await fetchApi(url)
     
     if (data.ok) {
@@ -102,12 +67,20 @@ async function requestAnalysis() {
 
 function formatAnalysis(text) {
   if (!text) return ''
-  // 简单的 Markdown 转 HTML
   return text
     .replace(/\n/g, '<br>')
     .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
     .replace(/\*(.*?)\*/g, '<em>$1</em>')
+    .replace(/^#{1,3}\s+(.*?)$/gm, '<h4>$1</h4>')
+    .replace(/^[-*]\s+(.*?)$/gm, '<li>$1</li>')
 }
+
+// 监听代码变化，自动分析
+watch(() => [props.code, props.period], () => {
+  if (props.code) {
+    requestAnalysis()
+  }
+}, { immediate: true })
 </script>
 
 <style scoped>
@@ -119,6 +92,10 @@ function formatAnalysis(text) {
   display: flex;
   align-items: center;
   gap: 8px;
+}
+
+.ai-icon {
+  font-size: 16px;
 }
 
 .ai-btn {
@@ -156,48 +133,6 @@ function formatAnalysis(text) {
   100% { background-position: 0% 50%; }
 }
 
-.analysis-types {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  margin-bottom: 12px;
-}
-
-.type-group {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  flex-wrap: wrap;
-}
-
-.group-label {
-  font-size: 11px;
-  color: var(--muted);
-  min-width: 60px;
-}
-
-.analysis-types button {
-  padding: 5px 12px;
-  background: var(--card2);
-  border: 1px solid var(--line);
-  color: var(--muted);
-  border-radius: 6px;
-  cursor: pointer;
-  font-size: 12px;
-  transition: all 0.2s;
-}
-
-.analysis-types button:hover {
-  color: var(--text);
-  border-color: var(--accent);
-}
-
-.analysis-types button.active {
-  background: var(--accent);
-  color: #04101f;
-  border-color: var(--accent);
-}
-
 .error {
   color: var(--up);
   padding: 12px;
@@ -229,6 +164,17 @@ function formatAnalysis(text) {
   font-style: normal;
 }
 
+.analysis-text :deep(h4) {
+  color: var(--accent);
+  margin: 12px 0 6px;
+  font-size: 14px;
+}
+
+.analysis-text :deep(li) {
+  margin-left: 16px;
+  margin-bottom: 4px;
+}
+
 .placeholder {
   padding: 24px;
   text-align: center;
@@ -237,5 +183,28 @@ function formatAnalysis(text) {
   background: var(--card2);
   border-radius: 8px;
   border: 1px dashed var(--line);
+}
+
+.loading-indicator {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 20px;
+  color: var(--accent);
+  font-size: 13px;
+}
+
+.loading-spinner {
+  width: 20px;
+  height: 20px;
+  border: 2px solid var(--line);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
 }
 </style>
