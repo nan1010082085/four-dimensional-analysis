@@ -648,6 +648,8 @@ async function loadDatasourceConfig() {
 // 切换数据源
 async function switchDatasource(source) {
   try {
+    setStatus('切换数据源中...', false)
+    
     const data = await fetchApi('/api/datasource', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -657,13 +659,23 @@ async function switchDatasource(source) {
     if (data.ok) {
       dataSource.value = data.data_source
       showDatasourcePanel.value = false
-      // 重新加载数据
-      loadAll()
+      
+      // 清空当前数据
+      quote.value = null
+      fundamentals.value = null
+      funds.value = null
+      kline.value = { bars: [], indicators: null }
+      minuteData.value = []
+      
+      // 重新加载所有数据
+      await loadAll()
     } else {
       alert('切换失败: ' + data.error)
+      setStatus('切换失败', false)
     }
   } catch (e) {
     alert('切换失败: ' + e.message)
+    setStatus('切换失败', false)
   }
 }
 
