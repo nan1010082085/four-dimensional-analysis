@@ -1,0 +1,42 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+*.egg-info/
+dist/
+build/
+
+# Node
+node_modules/
+frontend/dist/
+.npm
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# 环境变量（私有）
+.env
+.env.local
+.env.*.local
+
+# 日志
+*.log
+flask.log
+
+# 模拟盘数据
+paper_trading.json
+
+# 系统文件
+.DS_Store
+Thumbs.db
+
+# 部署产物
+deploy/output/
+*.tar.gz
