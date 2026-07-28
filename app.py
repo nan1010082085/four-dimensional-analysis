@@ -22,8 +22,11 @@ load_dotenv()
 # 导入 AI 分析模块
 from ai import get_analyzer
 
-APP_DIR = "/Users/yangdongnan/work/four-dimensional-analysis"
-app = Flask(__name__, static_folder="frontend/dist", static_url_path="")
+# 获取应用目录（支持本地和服务器）
+APP_DIR = os.path.dirname(os.path.abspath(__file__))
+STATIC_DIR = os.path.join(APP_DIR, "frontend-dist")
+
+app = Flask(__name__, static_folder=STATIC_DIR, static_url_path="")
 CORS(app)
 
 # 数据源配置
