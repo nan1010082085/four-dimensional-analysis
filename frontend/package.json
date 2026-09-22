@@ -8,6 +8,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@nan1010082085/vigil-browser": "^0.2.9",
     "echarts": "^5.6.0",
     "vue": "^3.5.0"
   },

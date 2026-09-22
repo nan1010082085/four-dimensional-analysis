@@ -28,6 +28,14 @@ STATIC_DIR = os.path.join(APP_DIR, "frontend-dist")
 app = Flask(__name__, static_folder=STATIC_DIR, static_url_path="")
 CORS(app)
 
+# Vigil 监控（无 VIGIL_TOKEN 时跳过）
+try:
+    from vigil_client import setup_flask_vigil
+
+    setup_flask_vigil(app)
+except Exception as _vigil_err:  # noqa: BLE001
+    print(f"[vigil] skip init: {_vigil_err}")
+
 # 数据源配置
 DATA_SOURCE = os.environ.get('DATA_SOURCE', 'legacy')  # tushare / legacy
 data_source = None
@@ -714,20 +722,50 @@ def api_ai_analysis():
         "quote": quote,
         "kline": {"bars": bars, "indicators": indicators} if bars else None,
     }
-    
+
     # 添加基本面和资金面数据
     if kind == "stock" and quote:
-        analysis_data["fundamentals"] = {
-            "pe": quote.get("pe"),
-            "turnover": quote.get("turnover"),
-            "volume": quote.get("volume"),
-            "amount": quote.get("amount"),
-        }
-        analysis_data["funds"] = {
-            "amount": quote.get("amount"),
-            "outer": quote.get("outer"),
-            "inner": quote.get("inner"),
-        }
+        # 尝试获取更详细的基本面数据
+        fund_data = None
+        if ds:
+            fund_data, _ = ds.get_stock_fundamentals(code)
+
+        if fund_data:
+            analysis_data["fundamentals"] = {
+                "pe": fund_data.get("pe"),
+                "pb": fund_data.get("pb"),
+                "turnover": fund_data.get("turnover_rate") or quote.get("turnover"),
+                "total_mv": fund_data.get("total_mv"),
+                "circ_mv": fund_data.get("circ_mv"),
+            }
+        else:
+            analysis_data["fundamentals"] = {
+                "pe": quote.get("pe"),
+                "turnover": quote.get("turnover"),
+                "volume": quote.get("volume"),
+                "amount": quote.get("amount"),
+            }
+
+        # 尝试获取资金流向数据
+        fund_flow = None
+        if ds:
+            fund_flow, _ = ds.get_stock_fund_flow(code)
+
+        if fund_flow:
+            analysis_data["funds"] = {
+                "amount": quote.get("amount"),
+                "outer": quote.get("outer"),
+                "inner": quote.get("inner"),
+                "main_net": fund_flow.get("main_net"),
+                "super_net": fund_flow.get("super_net"),
+                "big_net": fund_flow.get("big_net"),
+            }
+        else:
+            analysis_data["funds"] = {
+                "amount": quote.get("amount"),
+                "outer": quote.get("outer"),
+                "inner": quote.get("inner"),
+            }
     
     # 调用 AI 分析
     analyzer = get_analyzer()
