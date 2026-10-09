@@ -31,6 +31,17 @@ export function resolveVigilEndpoint(): string {
  * 本项目无 Vue Router，仅安装 vuePlugin。
  * @param app Vue 应用实例
  */
+/**
+ * 解析前端采样率（VITE_VIGIL_SAMPLE_RATE，默认 1）。
+ */
+function resolveSampleRate(): number {
+  const raw = (import.meta.env.VITE_VIGIL_SAMPLE_RATE as string | undefined)?.trim()
+  if (!raw) return 1
+  const n = Number(raw)
+  if (!Number.isFinite(n)) return 1
+  return Math.min(1, Math.max(0, n))
+}
+
 export async function setupVigil(app: App): Promise<BrowserVigil | null> {
   if (vigilInstance) return vigilInstance
 
@@ -50,8 +61,10 @@ export async function setupVigil(app: App): Promise<BrowserVigil | null> {
       token,
       endpoint,
       service: { name: 'four-dimensional-analysis', env: environment },
+      sampleRate: resolveSampleRate(),
     })
     app.use(vigilInstance.vuePlugin)
+    installAutoClick()
     console.log('[vigil] Vue tracking installed')
     return vigilInstance
   } catch (err) {
@@ -65,4 +78,22 @@ export async function setupVigil(app: App): Promise<BrowserVigil | null> {
  */
 export function getVigil(): BrowserVigil | null {
   return vigilInstance
+}
+
+/**
+ * 按钮与链接点击自动上报，覆盖 trackClick 对应的 click 事件。
+ */
+function installAutoClick(): void {
+  if (typeof document === 'undefined' || !vigilInstance) return
+  document.addEventListener('click', (event) => {
+    const raw = event.target
+    if (!(raw instanceof Element) || !vigilInstance) return
+    const el = raw.closest('button, a, [role="button"], input[type="submit"]')
+    if (!el) return
+    const target = el.getAttribute('data-vigil')
+      || el.id
+      || el.getAttribute('aria-label')
+      || el.tagName.toLowerCase()
+    vigilInstance.trackClick({ target: target.slice(0, 80), page: location.pathname })
+  }, true)
 }
